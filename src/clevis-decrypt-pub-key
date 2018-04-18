@@ -1,0 +1,28 @@
+#!/bin/bash  
+# vim: set tabstop=8 shiftwidth=4 softtabstop=4 expandtab smarttab colorcolumn=80:
+# Author: Max Tottenham <mtottenh@gmail.com>
+
+[ $# -eq 1 -a "$1" == "--summary" ] && exit 1
+read -d . hdr
+
+if [ "$(jose fmt -q "$hdr" -SyOg clevis -g pin -u-)" != "pub-key" ]; then
+    echo "JWE pin mismatch" >&2
+    exit 1
+fi
+
+pgp_msg=$(jose fmt -q "$hdr" -SyOg clevis -g pub-key -g ctx -Su-)
+pgp_msg=$(jose b64 dec -i- -O- < <(echo -n $pgp_msg))
+GPG_TTY=""
+if $(gpg --card-status &>/dev/null); then
+    echo "* GPG Keycard found. Attempting key import" >&2
+        {    /usr/bin/expect << EOF
+spawn gpg --card-edit 
+expect -re ".*gpg/card>.*"
+send "fetch\r"
+expect -re ".*gpg/card>.*"
+send  "quit\r"
+EOF
+} &> /dev/null 
+fi
+
+gpg --pinentry-mode loopback --decrypt < <(echo -n "$pgp_msg")

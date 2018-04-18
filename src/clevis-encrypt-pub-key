@@ -1,0 +1,30 @@
+#!/bin/bash 
+# vim: set tabstop=8 shiftwidth=4 softtabstop=4 expandtab smarttab colorcolumn=80:
+# Author: Max Tottenham <mtottenh@gmail.com>
+
+[ $# -eq 1 -a "$1" == "--summary" ] && exit 1
+
+if ! cfg=$(jose fmt -j "$1" -Oo- 2>/dev/null); then
+    echo "Configuration is malformed!" >&2
+    exit 1
+fi
+
+key_id=$(jose fmt -j "$cfg" -g "key_id" -u-)
+if [ -z $key_id ]; then
+    echo "key_id argument is required" >&2
+    exit 1;
+fi
+
+if ! gpg --list-keys $key_id &>/dev/null; then
+    echo "Key with ID '$key_id' doesn't exist in gpg keychain!" >&2
+    exit 1;
+fi
+
+GPG_TTY=$(tty);
+jwe='{"protected":{"clevis":{"pin":"pub-key", "pub-key" : { } } } }'
+#jwe=$(jose fmt -j "$jwe" -Og protected -g clevis -g pub-key -q "$key_id" -Ss key_id -UUUo-)
+enc=$(gpg --trust-model always --encrypt -r $key_id -ao- )
+enc=$(jose b64 enc -I- -o- < <(echo "$enc"))
+jwe=$(jose fmt -j "$jwe" -Og protected -g clevis -g pub-key -q "$enc" -Ss ctx -UUUUo-)
+jwk=$(jose jwk gen -i '{"alg":"A256GCM"}')
+exec jose jwe enc -i- -k- -I- -c < <(echo -n "${jwe}$jwk")
