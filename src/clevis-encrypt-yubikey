@@ -1,0 +1,40 @@
+#!/bin/bash
+# vim: set tabstop=8 shiftwidth=4 softtabstop=4 expandtab smarttab colorcolumn=80:
+# Author: Max Tottenham <mtottenh@gmail.com>
+[ $# -eq 1 -a "$1" == "--summary" ] && exit 1
+
+if ! cfg=$(jose fmt -j "$1" -Oo- 2>/dev/null); then
+    echo "Configuration is malformed!" >&2
+    exit 1
+fi
+
+slot=$(jose fmt -j "$cfg" -g "slot" -u-)
+if [ -z $slot ]; then
+    echo "slot argument is required" >&2
+    exit 1
+elif [ $slot != "2" ] && [ "$slot" != "1" ]; then
+    echo "Parameter 'slot' can only be '1' or '2'" >&2
+    exit 1
+fi
+
+# Construct Yubikey Challenge
+chal=$(dd if=/dev/urandom of=/dev/stdout bs=32 count=1 2>/dev/null | jose b64 enc -I- -o-)
+
+if ! resp=$(ykchalresp -$slot "$chal"); then
+    echo "Unable to perform challenge response with Yubikey for slot $slot" >&2
+    exit 1
+fi
+
+key=$(echo -n "$resp" | jose pbkdf2 -i- -a S256 | jose b64 enc -I- -o-)
+
+jwk=$(jose jwk gen -i '{ "alg" : "A256GCM" }')
+
+jwk=$(jose fmt -j "$jwk" -O -q "$key" -Ss k -Uo-)
+
+
+jwe='{"protected":{"clevis":{"pin":"yubikey", "yubikey": {} }}}'
+#Set challenege in Yubikey header
+jwe=$(jose fmt -j "$jwe" -Og protected -g clevis -g yubikey -q "$chal" -Ss chal -U -q "$slot" -Ss slot -UUUUo-)
+
+exec jose jwe enc -i- -k- -I- -c < <(echo -n "$jwe$jwk"; cat)
+
