@@ -12,5 +12,5 @@ if initramfs_tools.found()
   subdir('hooks')
   subdir('scripts')
 else
-  warning('Will not install initramfs-tools module due ot missing dependencies!')
+  warning('Will not install initramfs-tools module due to missing dependencies!')
 endif
