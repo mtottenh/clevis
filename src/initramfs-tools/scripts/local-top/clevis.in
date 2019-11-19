@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # Copyright (c) 2017 Red Hat, Inc.
 # Copyright (c) 2017 Shawn Rose
@@ -30,8 +30,10 @@ esac
 # Return 0 if $pid has a file descriptor pointing to $name, 1 otherwise
 in_fds() {
     local  pid="$1" name="$2" fd
-    for fd in $(find "/proc/$pid/fd" -type l); do
-        [ "$(readlink -f "$fd")" != "$name" ] || return 0
+    for fd in /proc/$pid/fd/*; do
+        if [ -e "$fd" ]; then
+            [ "$(readlink -f "$fd")" != "$name" ] || return 0
+        fi
     done
     return 1
 }
@@ -41,7 +43,7 @@ in_fds() {
 get_askpass_pid() {
     psinfo=$(ps) # Doing this so I don't end up matching myself
     echo "$psinfo" | awk "/$cryptkeyscript/ { print \$1 }" | \
-        while read pid; do
+        while read -r pid; do
         if in_fds "$pid" "$PASSFIFO"; then
             echo "$pid"
             break
@@ -80,13 +82,13 @@ clevisloop()
         done
 
         # Import CRYPTTAB_SOURCE from the askpass process.
-        local $(grep '^CRYPTTAB_SOURCE=' /proc/$pid/environ)
+        local "$(grep '^CRYPTTAB_SOURCE=' /proc/"$pid"/environ)"
 
         # Make sure that CRYPTTAB_SOURCE is actually a block device
         [ ! -b "$CRYPTTAB_SOURCE" ] && continue
 
         # Make the source has changed if needed
-        [ "$CRYPTTAB_SOURCE" == "$OLD_CRYPTTAB_SOURCE" ] && continue
+        [ "$CRYPTTAB_SOURCE" = "$OLD_CRYPTTAB_SOURCE" ] && continue
 
         OLD_CRYPTTAB_SOURCE="$CRYPTTAB_SOURCE"
 
@@ -96,8 +98,8 @@ clevisloop()
 
             [ "$state" != "active" ] && continue
             [ "$uuid" != "$UUID" ] && continue
-            luksmeta load -d "$CRYPTTAB_SOURCE" -s $slot -u $UUID | \
-                clevis decrypt > $PASSFIFO
+            luksmeta load -d "$CRYPTTAB_SOURCE" -s "$slot" -u "$UUID" | \
+                clevis decrypt > "$PASSFIFO"
             break
         done
 
@@ -146,10 +148,10 @@ clevis_all_netbootable_devices() {
 # Check if network is up before trying to configure it.
 eth_check() {
     for device in $(clevis_all_netbootable_devices); do
-        ip link set dev $device up
+        ip link set dev "$device" up
         sleep 1
-        ETH_HAS_CARRIER=$(</sys/class/net/$device/carrier)
-        if [ "$ETH_HAS_CARRIER" == '1' ]; then
+        ETH_HAS_CARRIER=$(cat /sys/class/net/"$device"/carrier)
+        if [ "$ETH_HAS_CARRIER" = '1' ]; then
             return 0
         fi
     done
