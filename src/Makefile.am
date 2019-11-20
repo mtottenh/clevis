@@ -17,8 +17,10 @@ bin_PROGRAMS = \
 dist_bin_SCRIPTS = \
     clevis-encrypt-http \
     clevis-encrypt-tang \
+	clevis-encrypt-yubikey \
     clevis-decrypt-http \
     clevis-decrypt-tang \
+	clevis-decrypt-yubikey \
     clevis-bind-luks \
     clevis-luks-unlock \
     clevis-luks-bind \

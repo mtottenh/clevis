@@ -39,6 +39,7 @@ install() {
         clevis-decrypt-http \
         clevis-decrypt-tang \
         clevis-decrypt-sss \
+        clevis-decrypt-yubikey \
         @libexecdir@/clevis-luks-askpass \
         clevis-decrypt \
         luksmeta \
@@ -46,6 +47,7 @@ install() {
         mktemp \
         curl \
         jose \
+        ykchalresp \
         nc
 
     for cmd in clevis-decrypt-tpm2 \
